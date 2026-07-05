@@ -1,0 +1,58 @@
+name: NSE Scanner (30-min, market hours)
+
+on:
+  schedule:
+    - cron: '15,45 3-9 * * 1-5'
+    - cron: '0,30 4-10 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Test with N symbols (blank = all)'
+        required: false
+        default: ''
+
+concurrency:
+  group: nse-scan
+  cancel-in-progress: false
+
+permissions:
+  contents: write        # allow committing docs/data.json back to the repo
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 32
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - run: pip install -r requirements.txt
+
+      # 1) build fresh Excel with your generator
+      - name: Generate scanner Excel
+        env:
+          WORKERS: "8"
+          LIMIT: ${{ github.event.inputs.limit }}
+        run: python generate_scanner.py
+
+      # 2) run strategies (Telegram optional; prints if no secrets)
+      - name: Run strategies
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python run_scanner.py
+
+      # 3) export dashboard data
+      - name: Export dashboard data
+        run: python export_dashboard_data.py
+
+      # 4) commit docs/data.json so GitHub Pages serves the latest
+      - name: Commit data
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/data.json
+          git commit -m "data update $(date -u +%FT%TZ) [skip ci]" || echo "no changes"
+          git push
