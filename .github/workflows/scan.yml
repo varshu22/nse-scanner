@@ -2,8 +2,8 @@ name: NSE Scanner (30-min, market hours)
 
 on:
   schedule:
-    - cron: '15,45 3-9 * * 1-5'
-    - cron: '0,30 4-10 * * 1-5'
+     # hourly during NSE market hours (09:15-15:30 IST = 03:45-10:00 UTC), Mon-Fri
+     - cron: '45 3-9 * * 1-5'
   workflow_dispatch:
     inputs:
       limit:
@@ -21,7 +21,7 @@ permissions:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 32
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
