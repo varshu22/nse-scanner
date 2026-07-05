@@ -1,5 +1,0 @@
-__pycache__/
-*.pyc
-snapshot_latest.csv
-result_*.csv
-all_nse_scanner_*.xlsx
