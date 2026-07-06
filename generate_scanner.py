@@ -184,9 +184,9 @@ def candle_pattern(o, h, l, c):
     return "Bullish" if c > o else "Bearish"
 
 
-def fetch_data(symbol, retries=3):
+def fetch_data(symbol, retries=4):
     base_symbol = symbol.replace(".NS", "")
-    for _ in range(retries + 1):
+    for _attempt in range(retries + 1):
         try:
             time.sleep(random.uniform(0.2, 0.6))
             ticker = yf.Ticker(symbol)
@@ -337,6 +337,10 @@ def fetch_data(symbol, retries=3):
             row["Live_Day_Vol"] = _clean(live_day_vol, 2)
             return row
         except Exception:
+            if _attempt < retries:
+                # exponential backoff + jitter to ride out Yahoo rate limits
+                time.sleep(2.0 * (2 ** _attempt) + random.uniform(0, 1.5))
+                continue
             return {"Symbol": symbol}
 
 
@@ -399,4 +403,5 @@ df = df[ordered_cols]
 
 file_name = f"all_nse_scanner_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
 df.to_excel(file_name, index=False)
-print(f"Saved: {file_name}  ({len(df)} rows)")
+_ok = int(df["Last_Month_Candle"].notna().sum()) if "Last_Month_Candle" in df.columns else 0
+print(f"Saved: {file_name}  ({len(df)} rows, {_ok} with data, {len(df)-_ok} empty/throttled)")
