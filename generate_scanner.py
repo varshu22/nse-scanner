@@ -19,9 +19,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
-# curl_cffi impersonates a real Chrome browser (TLS + headers), which often
-# gets past Yahoo's blocking of cloud/datacenter IPs (GitHub Actions).
+# Plain yfinance by default (proven reliable on home IP and for Nifty500).
+# Set USE_CFFI=1 to try curl_cffi Chrome impersonation (only useful for cloud
+# experiments; it can interfere with normal runs, so it's OFF by default).
 def _make_session():
+    if os.environ.get("USE_CFFI", "").lower() not in ("1", "true", "yes"):
+        return None
     try:
         from curl_cffi import requests as _cffi
         s = _cffi.Session(impersonate="chrome")
@@ -224,15 +227,16 @@ def candle_pattern(o, h, l, c):
     return "Bullish" if c > o else "Bearish"
 
 
-def fetch_data(symbol, retries=1):
+def fetch_data(symbol, retries=2):
     base_symbol = symbol.replace(".NS", "")
     for _attempt in range(retries + 1):
         try:
+            time.sleep(random.uniform(0.2, 0.6))   # gentle pacing - avoids Yahoo throttle
             ticker = yf.Ticker(symbol, session=SESSION) if SESSION is not None else yf.Ticker(symbol)
-            daily_full   = ticker.history(period="1y",  interval="1d")   # 250d > EMA200 needs
+            daily_full   = ticker.history(period="2y",  interval="1d")
             weekly_full  = ticker.history(period="8mo", interval="1wk")
-            monthly_full = ticker.history(period="3y",  interval="1mo")  # only ~36 bars, cheap
-            hourly_full  = ticker.history(period="35d", interval="1h")   # enough for 4H(13)+RSI
+            monthly_full = ticker.history(period="3y",  interval="1mo")
+            hourly_full  = ticker.history(period="60d", interval="1h")
             m30_full     = ticker.history(period="5d",  interval="30m")
             m5_full      = ticker.history(period="5d",  interval="5m")
             if daily_full.empty or weekly_full.empty or monthly_full.empty:

@@ -11,7 +11,7 @@ REM GitHub Desktop default clone path is Documents\GitHub\<repo>.
 REM In GitHub Desktop: Repository menu -> "Show in Explorer" to confirm the exact path.
 set REPO=C:\Users\Varsha Singh\Documents\GitHub\nse-scanner
 set UNIVERSE=all
-set WORKERS=6
+set WORKERS=4
 
 cd /d "%REPO%" || (echo Repo folder not found: %REPO% & pause & exit /b 1)
 
