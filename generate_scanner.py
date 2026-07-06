@@ -240,7 +240,9 @@ def fetch_data(symbol, retries=2):
         try:
             time.sleep(random.uniform(0.2, 0.6))   # gentle pacing - avoids Yahoo throttle
             ticker = yf.Ticker(symbol, session=SESSION) if SESSION is not None else yf.Ticker(symbol)
-            daily_full = ticker.history(period="1y", interval="1d")   # always (LTP, EMA, RSI, D-block)
+            # intraday scope uses a short daily window (like the nifty500-scanner) to stay light
+            _dperiod = "3mo" if SCOPE == "intraday" else "1y"
+            daily_full = ticker.history(period=_dperiod, interval="1d")   # LTP, EMA, RSI, D-block
             if _FETCH_HIGHER:
                 weekly_full  = ticker.history(period="8mo", interval="1wk")
                 monthly_full = ticker.history(period="3y",  interval="1mo")
