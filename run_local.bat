@@ -17,6 +17,9 @@ cd /d "%REPO%" || (echo Repo folder not found: %REPO% & pause & exit /b 1)
 
 echo === %date% %time%  starting full scan ===
 
+REM 0) make sure dependencies are installed for THIS python (fast if already there)
+python -m pip install -r requirements.txt --quiet --disable-pip-version-check
+
 REM 1) sync to the latest cloud version (discard local generated files)
 git fetch origin
 git reset --hard origin/main
