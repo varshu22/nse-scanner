@@ -114,6 +114,11 @@ tbody tr:hover{background:var(--elev)}
         <select id="dayCandle"><option value="">Any</option><option>Bullish</option><option>Bearish</option><option>Doji</option><option>Bullish Marubozu</option><option>Bearish Marubozu</option></select></div>
       <div class="fgroup"><label class="lbl">Price vs EMA</label>
         <span class="chip" data-ema="50">Above EMA 50</span><span class="chip" data-ema="200">Above EMA 200</span></div>
+      <div class="fgroup"><label class="lbl">Segment</label>
+        <span class="chip" id="fnoChip" onclick="toggleFno()">F&amp;O only</span></div>
+      <div class="fgroup"><label class="lbl">Crossover (within threshold)</label>
+        <div id="crossChips"></div>
+        <div class="row2" style="margin-top:6px;align-items:center"><span style="font-size:12px;color:var(--muted)">within &plusmn;</span><input type="number" id="crossPct" value="0.3" step="0.1" min="0" style="max-width:72px"><span style="font-size:12px;color:var(--muted)">%</span></div></div>
       <div class="fgroup"><label class="lbl">Min 7-day avg volume</label><input type="number" id="minVol" placeholder="e.g. 100000"></div>
       <div class="fgroup"><label class="lbl">Search symbol</label><input type="text" id="search" placeholder="e.g. TATA"></div>
       <div class="note" id="srcnote"></div>
@@ -177,9 +182,20 @@ const STRATEGIES=[
 ];
 const STYLES=['All','Scalping','Intraday','Swing','Positional'];
 const SIG_ORDER={'Above High':0,'Upper Breakout':1,'Above Close':2,'Golden Zone':3,'Near Upper':4,'Near Lower':5,'Lower Breakdown':6};
+// Crossover proximity: two values are "crossing" if within +/- threshold %
+const CROSS_DEFS=[
+  {k:'9-21',t:'9 x 21 EMA',a:'EMA_9',b:'EMA_21'},
+  {k:'9-50',t:'9 x 50 EMA',a:'EMA_9',b:'EMA_50'},
+  {k:'9-200',t:'9 x 200 EMA',a:'EMA_9',b:'EMA_200'},
+  {k:'21-200',t:'21 x 200 EMA',a:'EMA_21',b:'EMA_200'},
+  {k:'ltp-vwap',t:'LTP x VWAP',a:'LTP',b:'VWAP_Daily'},
+];
+function near(a,b,pct){a=+a;b=+b;if(!isFinite(a)||!isFinite(b)||b===0)return false;return Math.abs(a-b)/Math.abs(b)*100<=pct;}
 
 let DATA=SAMPLE, COLS=SAMPLE.columns, ci={};
-let state={style:'All',strats:{},sigs:{},ema:{},sortKey:'signal',sortDir:1,range:''};
+let state={style:'All',strats:{},sigs:{},ema:{},sortKey:'signal',sortDir:1,range:'',fno:false,cross:{}};
+function toggleFno(){state.fno=!state.fno;document.getElementById('fnoChip').classList.toggle('on');render();}
+function buildCrossChips(){var el=document.getElementById('crossChips');el.innerHTML='';CROSS_DEFS.forEach(function(d){var c=document.createElement('span');c.className='chip'+(state.cross[d.k]?' on':'');c.textContent=d.t;c.onclick=function(){state.cross[d.k]=!state.cross[d.k];buildCrossChips();render();};el.appendChild(c);});}
 STRATEGIES.forEach(s=>state.strats[s.id]=true);
 
 function reindex(){ci={};COLS.forEach((c,i)=>ci[c]=i);}
@@ -209,11 +225,13 @@ function buildSigChips(){
 }
 function toggleRange(){ document.getElementById('rangeGroup').style.display=(state.style!=='Positional')?'block':'none'; }
 document.querySelectorAll('[data-ema]').forEach(ch=>{ch.onclick=()=>{const k=ch.dataset.ema;state.ema[k]=!state.ema[k];ch.classList.toggle('on');render();};});
-['rsiDmin','rsiDmax','rsiMmin','rsiMmax','minVol','search','dayCandle','rangeSel'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{state.range=document.getElementById('rangeSel').value;render();}));
+['rsiDmin','rsiDmax','rsiMmin','rsiMmax','minVol','search','dayCandle','rangeSel','crossPct'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{state.range=document.getElementById('rangeSel').value;render();}));
 function resetFilters(){
   ['rsiDmin','rsiDmax','rsiMmin','rsiMmax','minVol','search'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('dayCandle').value='';document.getElementById('rangeSel').value='';state.range='';
   state.ema={};document.querySelectorAll('[data-ema]').forEach(c=>c.classList.remove('on'));
+  state.fno=false;document.getElementById('fnoChip').classList.remove('on');
+  state.cross={};document.getElementById('crossPct').value='0.3';buildCrossChips();
   state.sigs={};buildSigChips();render();
 }
 function num(id){const v=document.getElementById(id).value;return v===''?null:+v;}
@@ -224,8 +242,13 @@ function compute(){
   const minVol=num('minVol'),dayC=document.getElementById('dayCandle').value,search=document.getElementById('search').value.trim().toUpperCase();
   const counts={}; STRATEGIES.forEach(s=>counts[s.id]=0);
   const out=[];
+  const crossActive=CROSS_DEFS.filter(d=>state.cross[d.k]);
+  const cpEl=document.getElementById('crossPct');
+  const crossPct=(cpEl && cpEl.value!=='')?+cpEl.value:0.3;
   for(const row of DATA.data){
     const g=(n)=>gv(row,n);
+    if(state.fno && ci['FnO']!=null && String(g('FnO'))!=='Yes') continue;
+    if(crossActive.length){let ok=true;for(const d of crossActive){if(!near(g(d.a),g(d.b),crossPct)){ok=false;break;}}if(!ok)continue;}
     for(const st of act){
       const res=st.run(g); if(!res) continue;
       if(state.sigs[res.signal]===false) continue;
@@ -306,7 +329,7 @@ async function loadRemote(manual){
     document.getElementById('srcnote').innerHTML='Live data from GitHub'+(j.generated?(', generated '+j.generated):'')+'. Auto-refreshes every '+AUTO_REFRESH_MIN+' min.';render();
   }catch(e){if(manual)alert('Could not fetch live data ('+e.message+').');if(DATA===SAMPLE||!DATA)useSample();}
 }
-function init(){reindex();buildStyles();buildStratChips();buildSigChips();buildHead();toggleRange();useSample();loadRemote(false);setInterval(()=>loadRemote(false),AUTO_REFRESH_MIN*60*1000);}
+function init(){reindex();buildStyles();buildStratChips();buildSigChips();buildCrossChips();buildHead();toggleRange();useSample();loadRemote(false);setInterval(()=>loadRemote(false),AUTO_REFRESH_MIN*60*1000);}
 init();
 
 function toggleTheme(){var d=document.documentElement;var light=d.getAttribute('data-theme')!=='light';if(light){d.setAttribute('data-theme','light');}else{d.removeAttribute('data-theme');}try{localStorage.setItem('nsetheme',light?'light':'dark');}catch(e){}var b=document.getElementById('themeBtn');if(b)b.textContent=light?'Dark':'Light';}
