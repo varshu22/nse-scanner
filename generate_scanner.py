@@ -19,6 +19,26 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
+# curl_cffi impersonates a real Chrome browser (TLS + headers), which often
+# gets past Yahoo's blocking of cloud/datacenter IPs (GitHub Actions).
+def _make_session():
+    try:
+        from curl_cffi import requests as _cffi
+        s = _cffi.Session(impersonate="chrome")
+        print("using curl_cffi Chrome impersonation session")
+        return s
+    except Exception as e:
+        print(f"curl_cffi unavailable ({type(e).__name__}) -> default yfinance session")
+        return None
+
+SESSION = _make_session()
+if SESSION is not None:
+    try:
+        yf.Ticker("RELIANCE.NS", session=SESSION)   # lazy, no network - just checks kwarg
+    except TypeError:
+        print("installed yfinance ignores session= -> disabling curl_cffi session")
+        SESSION = None
+
 LIMIT = int(os.environ["LIMIT"]) if os.environ.get("LIMIT") else None
 WORKERS = int(os.environ.get("WORKERS", "6"))
 
@@ -189,7 +209,7 @@ def fetch_data(symbol, retries=4):
     for _attempt in range(retries + 1):
         try:
             time.sleep(random.uniform(0.2, 0.6))
-            ticker = yf.Ticker(symbol)
+            ticker = yf.Ticker(symbol, session=SESSION) if SESSION is not None else yf.Ticker(symbol)
             daily_full   = ticker.history(period="2y",  interval="1d")
             weekly_full  = ticker.history(period="8mo", interval="1wk")
             monthly_full = ticker.history(period="3y",  interval="1mo")
