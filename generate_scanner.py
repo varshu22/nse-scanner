@@ -462,5 +462,7 @@ df = df[ordered_cols]
 
 file_name = f"all_nse_scanner_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
 df.to_excel(file_name, index=False)
-_ok = int(df["LTP"].notna().sum()) if "LTP" in df.columns else 0   # LTP present in every scope
+# count rows that actually fetched (LTP appears multiple times -> dedupe first)
+_dedup = df.loc[:, ~df.columns.duplicated()]
+_ok = int(_dedup["LTP"].notna().sum()) if "LTP" in _dedup.columns else 0
 print(f"Saved: {file_name}  ({len(df)} rows, {_ok} with data, {len(df)-_ok} empty/throttled)")
