@@ -78,4 +78,7 @@ STRATEGIES = [
     rect_run('M_Max_23', 'M_Min_23', 'M_Gap_Min_Max_%', 'M_Gap_Max_LTP_%', 'M_Gap_Min_LTP_%', '23-Month Rect Breakout', 'Swing'),
     rect_run('W_Max_21', 'W_Min_21', 'W_Gap_Min_Max_%', 'W_Gap_Max_LTP_%', 'W_Gap_Min_LTP_%', '21-Week Rect Breakout', 'Swing'),
     rect_run('D_Max_21', 'D_Min_21', 'D_Gap_Min_Max_%', 'D_Gap_Max_LTP_%', 'D_Gap_Min_LTP_%', '21-Day Rect Breakout', 'Swing'),
+    rect_run('H4_Max_13', 'H4_Min_13', 'H4_Gap_Min_Max_%', 'H4_Gap_Max_LTP_%', 'H4_Gap_Min_LTP_%', '4H Rect Breakout (13)', 'Intraday'),
+    rect_run('M30_Max_8', 'M30_Min_8', 'M30_Gap_Min_Max_%', 'M30_Gap_Max_LTP_%', 'M30_Gap_Min_LTP_%', '30min Rect Breakout (8)', 'Intraday'),
+    rect_run('M5_Max_5', 'M5_Min_5', 'M5_Gap_Min_Max_%', 'M5_Gap_Max_LTP_%', 'M5_Gap_Min_LTP_%', '5min Rect Breakout (5)', 'Scalping'),
 ]
