@@ -204,16 +204,15 @@ def candle_pattern(o, h, l, c):
     return "Bullish" if c > o else "Bearish"
 
 
-def fetch_data(symbol, retries=4):
+def fetch_data(symbol, retries=1):
     base_symbol = symbol.replace(".NS", "")
     for _attempt in range(retries + 1):
         try:
-            time.sleep(random.uniform(0.2, 0.6))
             ticker = yf.Ticker(symbol, session=SESSION) if SESSION is not None else yf.Ticker(symbol)
-            daily_full   = ticker.history(period="2y",  interval="1d")
+            daily_full   = ticker.history(period="1y",  interval="1d")   # 250d > EMA200 needs
             weekly_full  = ticker.history(period="8mo", interval="1wk")
-            monthly_full = ticker.history(period="3y",  interval="1mo")
-            hourly_full  = ticker.history(period="60d", interval="1h")
+            monthly_full = ticker.history(period="3y",  interval="1mo")  # only ~36 bars, cheap
+            hourly_full  = ticker.history(period="35d", interval="1h")   # enough for 4H(13)+RSI
             m30_full     = ticker.history(period="5d",  interval="30m")
             m5_full      = ticker.history(period="5d",  interval="5m")
             if daily_full.empty or weekly_full.empty or monthly_full.empty:
@@ -358,8 +357,7 @@ def fetch_data(symbol, retries=4):
             return row
         except Exception:
             if _attempt < retries:
-                # exponential backoff + jitter to ride out Yahoo rate limits
-                time.sleep(2.0 * (2 ** _attempt) + random.uniform(0, 1.5))
+                time.sleep(0.4 + random.uniform(0, 0.4))   # one quick retry, no long stall
                 continue
             return {"Symbol": symbol}
 
