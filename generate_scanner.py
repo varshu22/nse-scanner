@@ -15,7 +15,6 @@ import random
 import logging
 import requests
 from datetime import datetime
-from tqdm.auto import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
@@ -48,6 +47,36 @@ except Exception as e:
 if LIMIT:
     symbols = symbols[:LIMIT]
     print(f"LIMIT set -> scanning {len(symbols)} symbols")
+
+
+# ===============================
+# F&O MEMBERSHIP (Yes/No per stock)
+# ===============================
+# Primary: NSE F&O market-lot file. Fallback: bundled fno_symbols.txt.
+# Robust parse: keep only tokens that are real equity symbols in our universe.
+_equity_syms = {s.replace(".NS", "").strip().upper() for s in symbols}
+FNO = set()
+try:
+    _r = requests.get("https://nsearchives.nseindia.com/content/fo/fo_mktlots.csv",
+                      headers=_headers, timeout=30)
+    _r.raise_for_status()
+    for _line in _r.text.splitlines():
+        for _tok in _line.replace('"', '').split(','):
+            _t = _tok.strip().upper()
+            if _t in _equity_syms:
+                FNO.add(_t)
+    print(f"F&O list: {len(FNO)} symbols (live NSE)")
+except Exception as e:
+    print(f"F&O fetch failed ({type(e).__name__}: {str(e)[:50]}) -> trying fno_symbols.txt")
+try:
+    if len(FNO) < 20:  # fetch gave little/nothing -> use bundled file if present
+        with open("fno_symbols.txt") as _f:
+            FNO = {ln.strip().upper() for ln in _f if ln.strip() and not ln.startswith("#")}
+        print(f"F&O list: {len(FNO)} symbols (fallback file)")
+except FileNotFoundError:
+    pass
+if not FNO:
+    print("F&O list: none available -> all stocks marked FnO=No")
 
 
 # ===============================
@@ -181,7 +210,8 @@ def fetch_data(symbol, retries=3):
             weekly_hist = weekly_full["Close"].tail(22).iloc[:-1]; weekly_ltp = weekly_full["Close"].iloc[-1]
             monthly_hist = monthly_full["Close"].tail(24).iloc[:-1]; monthly_ltp = monthly_full["Close"].iloc[-1]
 
-            row = {"Symbol": symbol, "Date of Listing": listing_date_map.get(base_symbol, None)}
+            row = {"Symbol": symbol, "Date of Listing": listing_date_map.get(base_symbol, None),
+                   "FnO": "Yes" if base_symbol.upper() in FNO else "No"}
 
             for i in range(23):
                 row[f"M{i+1}"] = round(monthly_hist.iloc[i], 2) if i < len(monthly_hist) else None
@@ -311,10 +341,23 @@ def fetch_data(symbol, retries=3):
 
 
 final_data = []
+_total = len(symbols)
+_done = 0
+_next = 0
+_start = time.time()
+print(f"progress: 0/{_total}", flush=True)
 with ThreadPoolExecutor(max_workers=WORKERS) as executor:
     futures = [executor.submit(fetch_data, sym) for sym in symbols]
-    for future in tqdm(as_completed(futures), total=len(futures)):
+    for future in as_completed(futures):
         final_data.append(future.result())
+        _done += 1
+        _pct = _done * 100 // _total
+        if _pct >= _next or _done == _total:
+            _fill = _pct // 5
+            _bar = "#" * _fill + "-" * (20 - _fill)
+            _el = int(time.time() - _start)
+            print(f"[{_bar}] {_pct:3d}%  {_done}/{_total}  ({_el}s)", flush=True)
+            _next = _pct + 5   # print a bar line every ~5%
 
 df = pd.DataFrame(final_data)
 df = df.sort_values("Symbol").reset_index(drop=True)
@@ -329,7 +372,7 @@ for n in range(1, 5):
 
 candle_cols = sorted([c for c in df.columns if c.startswith("C") and c[1:2].isdigit()])
 ordered_cols = (
-    ["Symbol", "Date of Listing"]
+    ["Symbol", "Date of Listing", "FnO"]
     + [f"M{i}" for i in range(1, 24)] + ["M_LTP"]
     + [f"W{i}" for i in range(1, 22)] + ["W_LTP"]
     + [f"D{i}" for i in range(1, 22)] + ["LTP"]

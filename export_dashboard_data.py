@@ -7,7 +7,7 @@ import json, os, glob
 import datetime as dt
 import pandas as pd
 
-COLS = ['Symbol','LTP','M23','Last_Month_Candle','Last_Week_Candle','Last_Day_Candle','Live Candle','Last_30min_Candle',
+COLS = ['Symbol','FnO','LTP','M23','Last_Month_Candle','Last_Week_Candle','Last_Day_Candle','Live Candle','Last_30min_Candle',
 'PM_Open','PM_High','PM_Low','PM_Close','PM_Fib50','PM_Fib618',
 'PW_High','PW_Close','PW_Fib50','PW_Fib618','PD_High','PD_Close','PD_Fib50','PD_Fib618',
 'M_Max_23','M_Min_23','M_Gap_Min_Max_%','M_Gap_Max_LTP_%','M_Gap_Min_LTP_%',
