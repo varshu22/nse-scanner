@@ -1,4 +1,4 @@
-name: NSE Scanner (F&O intraday, 30-min)
+name: NSE Scanner (Nifty500 intraday, 30-min)
 
 on:
   schedule:
@@ -11,10 +11,10 @@ on:
         description: 'Which stocks to scan'
         type: choice
         options:
-          - fno
           - nifty500
+          - fno
           - all
-        default: fno
+        default: nifty500
       limit:
         description: 'Test with N symbols (blank = all)'
         required: false
@@ -44,8 +44,8 @@ jobs:
         env:
           WORKERS: "6"
           SCOPE: "intraday"    # cloud = intraday timeframes (Scalping + Intraday + daily-based)
-          # scheduled runs have no input -> default fno (smallest = best chance for intraday).
-          UNIVERSE: ${{ github.event.inputs.universe || 'fno' }}
+          # scheduled runs have no input -> default nifty500. Dropdown: nifty500 / fno / all.
+          UNIVERSE: ${{ github.event.inputs.universe || 'nifty500' }}
           LIMIT: ${{ github.event.inputs.limit }}
         run: python generate_scanner.py
 

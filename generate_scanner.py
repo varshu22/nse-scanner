@@ -247,9 +247,14 @@ def fetch_data(symbol, retries=2):
             else:
                 weekly_full = monthly_full = pd.DataFrame()
             if _FETCH_INTRADAY:
-                hourly_full  = ticker.history(period="30d", interval="1h")   # enough for 4H(13)+RSI
-                m30_full     = ticker.history(period="5d",  interval="30m")
-                m5_full      = ticker.history(period="5d",  interval="5m")
+                # like the nifty500-scanner: few short intraday calls; derive 30m by resampling 5m
+                hourly_full = ticker.history(period="10d", interval="1h")   # -> 4H(13)+RSI
+                m5_full     = ticker.history(period="2d",  interval="5m")    # -> 5m block + 30m (resampled)
+                if not m5_full.empty:
+                    m30_full = m5_full.resample("30min").agg(
+                        {"Open": "first", "High": "max", "Low": "min", "Close": "last", "Volume": "sum"}).dropna()
+                else:
+                    m30_full = pd.DataFrame()
             else:
                 hourly_full = m30_full = m5_full = pd.DataFrame()
             if daily_full.empty:
@@ -457,5 +462,5 @@ df = df[ordered_cols]
 
 file_name = f"all_nse_scanner_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
 df.to_excel(file_name, index=False)
-_ok = int(df["Last_Month_Candle"].notna().sum()) if "Last_Month_Candle" in df.columns else 0
+_ok = int(df["LTP"].notna().sum()) if "LTP" in df.columns else 0   # LTP present in every scope
 print(f"Saved: {file_name}  ({len(df)} rows, {_ok} with data, {len(df)-_ok} empty/throttled)")
