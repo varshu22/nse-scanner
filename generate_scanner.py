@@ -43,6 +43,13 @@ if SESSION is not None:
         SESSION = None
 
 LIMIT = int(os.environ["LIMIT"]) if os.environ.get("LIMIT") else None
+# SCOPE controls which timeframes to fetch (to keep cloud request-count low):
+#   all      -> everything (local 8 PM run)
+#   higher   -> daily+weekly+monthly only  (Positional + Swing)
+#   intraday -> daily+1h+30m+5m only        (Intraday + Scalping)
+SCOPE = os.environ.get("SCOPE", "all").lower()
+_FETCH_HIGHER = SCOPE in ("all", "higher")
+_FETCH_INTRADAY = SCOPE in ("all", "intraday")
 WORKERS = int(os.environ.get("WORKERS", "6"))
 
 # ===============================
@@ -233,13 +240,19 @@ def fetch_data(symbol, retries=2):
         try:
             time.sleep(random.uniform(0.2, 0.6))   # gentle pacing - avoids Yahoo throttle
             ticker = yf.Ticker(symbol, session=SESSION) if SESSION is not None else yf.Ticker(symbol)
-            daily_full   = ticker.history(period="2y",  interval="1d")
-            weekly_full  = ticker.history(period="8mo", interval="1wk")
-            monthly_full = ticker.history(period="3y",  interval="1mo")
-            hourly_full  = ticker.history(period="60d", interval="1h")
-            m30_full     = ticker.history(period="5d",  interval="30m")
-            m5_full      = ticker.history(period="5d",  interval="5m")
-            if daily_full.empty or weekly_full.empty or monthly_full.empty:
+            daily_full = ticker.history(period="1y", interval="1d")   # always (LTP, EMA, RSI, D-block)
+            if _FETCH_HIGHER:
+                weekly_full  = ticker.history(period="8mo", interval="1wk")
+                monthly_full = ticker.history(period="3y",  interval="1mo")
+            else:
+                weekly_full = monthly_full = pd.DataFrame()
+            if _FETCH_INTRADAY:
+                hourly_full  = ticker.history(period="30d", interval="1h")   # enough for 4H(13)+RSI
+                m30_full     = ticker.history(period="5d",  interval="30m")
+                m5_full      = ticker.history(period="5d",  interval="5m")
+            else:
+                hourly_full = m30_full = m5_full = pd.DataFrame()
+            if daily_full.empty:
                 raise ValueError("No data")
 
             if not hourly_full.empty:
@@ -250,18 +263,24 @@ def fetch_data(symbol, retries=2):
                 h4_full = pd.DataFrame()
 
             daily_hist = daily_full["Close"].tail(22).iloc[:-1]; daily_ltp = daily_full["Close"].iloc[-1]
-            weekly_hist = weekly_full["Close"].tail(22).iloc[:-1]; weekly_ltp = weekly_full["Close"].iloc[-1]
-            monthly_hist = monthly_full["Close"].tail(24).iloc[:-1]; monthly_ltp = monthly_full["Close"].iloc[-1]
+            if weekly_full.empty:
+                weekly_hist = pd.Series(dtype=float); weekly_ltp = None
+            else:
+                weekly_hist = weekly_full["Close"].tail(22).iloc[:-1]; weekly_ltp = weekly_full["Close"].iloc[-1]
+            if monthly_full.empty:
+                monthly_hist = pd.Series(dtype=float); monthly_ltp = None
+            else:
+                monthly_hist = monthly_full["Close"].tail(24).iloc[:-1]; monthly_ltp = monthly_full["Close"].iloc[-1]
 
             row = {"Symbol": symbol, "Date of Listing": listing_date_map.get(base_symbol, None),
                    "FnO": "Yes" if base_symbol.upper() in FNO else "No"}
 
             for i in range(23):
                 row[f"M{i+1}"] = round(monthly_hist.iloc[i], 2) if i < len(monthly_hist) else None
-            row["M_LTP"] = round(monthly_ltp, 2)
+            row["M_LTP"] = round(monthly_ltp, 2) if monthly_ltp is not None else None
             for i in range(21):
                 row[f"W{i+1}"] = round(weekly_hist.iloc[i], 2) if i < len(weekly_hist) else None
-            row["W_LTP"] = round(weekly_ltp, 2)
+            row["W_LTP"] = round(weekly_ltp, 2) if weekly_ltp is not None else None
             for i in range(21):
                 row[f"D{i+1}"] = round(daily_hist.iloc[i], 2) if i < len(daily_hist) else None
             row["LTP"] = round(daily_ltp, 2)
@@ -330,9 +349,12 @@ def fetch_data(symbol, retries=2):
 
             d = daily_full["Close"].diff()
             row["RSI_Daily"] = _clean((100 - (100 / (1 + d.clip(lower=0).ewm(alpha=1/14, adjust=False).mean() / (-d.clip(upper=0)).ewm(alpha=1/14, adjust=False).mean()))).iloc[-1], 2)
-            d = weekly_full["Close"].diff()
-            row["RSI_Weekly"] = _clean((100 - (100 / (1 + d.clip(lower=0).ewm(alpha=1/14, adjust=False).mean() / (-d.clip(upper=0)).ewm(alpha=1/14, adjust=False).mean()))).iloc[-1], 2)
-            row["RSI_Monthly"] = last_rsi(monthly_full["Close"])
+            if weekly_full.empty:
+                row["RSI_Weekly"] = None
+            else:
+                d = weekly_full["Close"].diff()
+                row["RSI_Weekly"] = _clean((100 - (100 / (1 + d.clip(lower=0).ewm(alpha=1/14, adjust=False).mean() / (-d.clip(upper=0)).ewm(alpha=1/14, adjust=False).mean()))).iloc[-1], 2)
+            row["RSI_Monthly"] = last_rsi(monthly_full["Close"]) if not monthly_full.empty else None
             row["RSI_4H"] = last_rsi(h4_close); row["RSI_30m"] = last_rsi(m30_close); row["RSI_5m"] = last_rsi(m5_close)
 
             if not m30_full.empty and len(m30_full) >= 2:
@@ -341,21 +363,11 @@ def fetch_data(symbol, retries=2):
             else:
                 row["Last_30min_Candle"] = None
 
-            m_avg, m_max, m_min = monthly_hist.mean(), monthly_hist.max(), monthly_hist.min()
-            w_avg, w_max, w_min = weekly_hist.mean(), weekly_hist.max(), weekly_hist.min()
+            # monthly & weekly via safe_metrics (returns {} when that timeframe was skipped)
+            row.update(safe_metrics(monthly_hist, monthly_ltp, "M", "23"))
+            row.update(safe_metrics(weekly_hist, weekly_ltp, "W", "21"))
             d_avg, d_max, d_min = daily_hist.mean(), daily_hist.max(), daily_hist.min()
             row.update({
-                "Avg_23M": round(m_avg, 2), "M_Max_23": round(m_max, 2), "M_Min_23": round(m_min, 2),
-                "M_LTP_Position": "Above Max" if monthly_ltp > m_max else "Below Min" if monthly_ltp < m_min else "Between",
-                "M_Gap_Min_Max_%": round(((m_max - m_min) / m_min) * 100, 2),
-                "M_Gap_Max_LTP_%": round(((monthly_ltp - m_max) / m_max) * 100, 2),
-                "M_Gap_Min_LTP_%": round(((monthly_ltp - m_min) / m_min) * 100, 2),
-                "Avg_21W": round(w_avg, 2), "W_Avg_vs_LTP_%": round(((weekly_ltp - w_avg) / w_avg) * 100, 2),
-                "W_Max_21": round(w_max, 2), "W_Min_21": round(w_min, 2),
-                "W_LTP_Position": "Above Max" if weekly_ltp > w_max else "Below Min" if weekly_ltp < w_min else "Between",
-                "W_Gap_Min_Max_%": round(((w_max - w_min) / w_min) * 100, 2),
-                "W_Gap_Max_LTP_%": round(((weekly_ltp - w_max) / w_max) * 100, 2),
-                "W_Gap_Min_LTP_%": round(((weekly_ltp - w_min) / w_min) * 100, 2),
                 "Avg_21D": round(d_avg, 2), "D_Avg_vs_LTP_%": round(((daily_ltp - d_avg) / d_avg) * 100, 2),
                 "D_Max_21": round(d_max, 2), "D_Min_21": round(d_min, 2),
                 "D_LTP_Position": "Above Max" if daily_ltp > d_max else "Below Min" if daily_ltp < d_min else "Between",

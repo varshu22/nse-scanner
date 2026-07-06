@@ -1,19 +1,20 @@
-name: NSE Scanner (Nifty500, hourly)
+name: NSE Scanner (F&O intraday, 30-min)
 
 on:
   schedule:
-    # hourly during NSE market hours (~09:15-15:15 IST = 03:45-09:45 UTC), Mon-Fri
-    - cron: '45 3-9 * * 1-5'
+    # every 30 min during NSE market hours (09:15-15:30 IST = 03:45-10:00 UTC), Mon-Fri
+    - cron: '15,45 3-9 * * 1-5'
+    - cron: '0,30 4-10 * * 1-5'
   workflow_dispatch:
     inputs:
       universe:
         description: 'Which stocks to scan'
         type: choice
         options:
-          - nifty500
           - fno
+          - nifty500
           - all
-        default: nifty500
+        default: fno
       limit:
         description: 'Test with N symbols (blank = all)'
         required: false
@@ -42,9 +43,9 @@ jobs:
       - name: Generate scanner Excel
         env:
           WORKERS: "6"
-          # scheduled (hourly) runs have no input -> default nifty500.
-          # manual "Run workflow" uses the dropdown choice.
-          UNIVERSE: ${{ github.event.inputs.universe || 'nifty500' }}
+          SCOPE: "intraday"    # cloud = intraday timeframes (Scalping + Intraday + daily-based)
+          # scheduled runs have no input -> default fno (smallest = best chance for intraday).
+          UNIVERSE: ${{ github.event.inputs.universe || 'fno' }}
           LIMIT: ${{ github.event.inputs.limit }}
         run: python generate_scanner.py
 
