@@ -6,6 +6,14 @@ on:
     - cron: '45 3-9 * * 1-5'
   workflow_dispatch:
     inputs:
+      universe:
+        description: 'Which stocks to scan'
+        type: choice
+        options:
+          - nifty500
+          - fno
+          - all
+        default: nifty500
       limit:
         description: 'Test with N symbols (blank = all)'
         required: false
@@ -34,7 +42,9 @@ jobs:
       - name: Generate scanner Excel
         env:
           WORKERS: "6"
-          UNIVERSE: "nifty500"   # cloud = Nifty 500 (~500, proven reliable). "all" runs on a home machine.
+          # scheduled (hourly) runs have no input -> default nifty500.
+          # manual "Run workflow" uses the dropdown choice.
+          UNIVERSE: ${{ github.event.inputs.universe || 'nifty500' }}
           LIMIT: ${{ github.event.inputs.limit }}
         run: python generate_scanner.py
 
