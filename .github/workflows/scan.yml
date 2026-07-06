@@ -1,4 +1,4 @@
-name: NSE Scanner (30-min, market hours)
+name: NSE Scanner (Nifty500, hourly)
 
 on:
   schedule:
