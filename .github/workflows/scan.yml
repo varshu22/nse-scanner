@@ -2,8 +2,8 @@ name: NSE Scanner (30-min, market hours)
 
 on:
   schedule:
-     # hourly during NSE market hours (09:15-15:30 IST = 03:45-10:00 UTC), Mon-Fri
-     - cron: '45 3-9 * * 1-5'
+    # hourly during NSE market hours (09:15-15:30 IST = 03:45-10:00 UTC), Mon-Fri
+    - cron: '45 3-9 * * 1-5'
   workflow_dispatch:
     inputs:
       limit:
@@ -33,7 +33,7 @@ jobs:
       # 1) build fresh Excel with your generator
       - name: Generate scanner Excel
         env:
-          WORKERS: "8"
+          WORKERS: "3"
           LIMIT: ${{ github.event.inputs.limit }}
         run: python generate_scanner.py
 
