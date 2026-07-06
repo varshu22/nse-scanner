@@ -33,7 +33,7 @@ jobs:
       # 1) build fresh Excel with your generator
       - name: Generate scanner Excel
         env:
-          WORKERS: "3"
+          WORKERS: "6"
           LIMIT: ${{ github.event.inputs.limit }}
         run: python generate_scanner.py
 
