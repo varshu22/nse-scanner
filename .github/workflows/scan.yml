@@ -34,6 +34,7 @@ jobs:
       - name: Generate scanner Excel
         env:
           WORKERS: "6"
+          UNIVERSE: "fno"   # cloud = F&O only (~208, reliable). Use "all" only on a home machine.
           LIMIT: ${{ github.event.inputs.limit }}
         run: python generate_scanner.py
 

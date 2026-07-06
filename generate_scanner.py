@@ -98,6 +98,13 @@ except FileNotFoundError:
 if not FNO:
     print("F&O list: none available -> all stocks marked FnO=No")
 
+# UNIVERSE=fno  -> scan only F&O stocks (~208): light enough to run reliably in
+# the cloud (Yahoo throttles the full 2000+ universe from GitHub IPs).
+# UNIVERSE=all  -> scan everything (best run on an always-on home machine).
+if os.environ.get("UNIVERSE", "all").lower() == "fno" and FNO:
+    symbols = [s for s in symbols if s.replace(".NS", "").strip().upper() in FNO]
+    print(f"UNIVERSE=fno -> scanning {len(symbols)} F&O stocks only")
+
 
 # ===============================
 # HELPERS

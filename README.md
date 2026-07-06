@@ -1,13 +1,13 @@
 # NSE Strategy Scanner — auto-updating live dashboard
 
 A stock screener that filters your NSE universe by trading strategies.
-GitHub Actions rebuilds the data every 30 minutes during market hours and
+GitHub Actions rebuilds the data every 60 minutes during market hours and
 publishes it; a GitHub-Pages dashboard auto-fetches it, so opening the page on
 your phone always shows near-live results. **No server, no manual runs.**
 
 ## How it flows
 ```
-GitHub Actions (every 30 min, market hours)
+GitHub Actions (hourly, market hours)
   1. generate_scanner.py      -> all_nse_scanner_<date>.xlsx   (your generator)
   2. run_scanner.py           -> runs frozen strategies (Telegram optional)
   3. export_dashboard_data.py -> docs/data.json  (timestamped)
