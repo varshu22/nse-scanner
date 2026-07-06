@@ -106,7 +106,7 @@ tbody tr:hover{background:var(--elev)}
       <div class="phead"><h3>Filters</h3><button class="reset" onclick="resetFilters()">Reset</button></div>
       <div class="fgroup"><label class="lbl">Strategy</label><div id="stratChips"></div></div>
       <div class="fgroup"><label class="lbl">Signal</label><div id="sigChips"></div></div>
-      <div class="fgroup" id="rangeGroup"><label class="lbl">Rectangle range width (Swing)</label>
+      <div class="fgroup" id="rangeGroup"><label class="lbl">Rectangle range width</label>
         <select id="rangeSel"><option value="">Any</option><option>Very narrow</option><option>Narrow</option><option>Medium</option><option>Wide</option></select></div>
       <div class="fgroup"><label class="lbl">RSI Daily</label><div class="row2"><input type="number" id="rsiDmin" placeholder="min"><input type="number" id="rsiDmax" placeholder="max"></div></div>
       <div class="fgroup"><label class="lbl">RSI Monthly</label><div class="row2"><input type="number" id="rsiMmin" placeholder="min"><input type="number" id="rsiMmax" placeholder="max"></div></div>
@@ -171,6 +171,9 @@ const STRATEGIES=[
   {id:'s1',name:'23-Month Rect Breakout',  style:'Swing',signals:RECT_SIG,run:rect('M_Max_23','M_Min_23','M_Gap_Min_Max_%','M_Gap_Max_LTP_%','M_Gap_Min_LTP_%')},
   {id:'s2',name:'21-Week Rect Breakout',   style:'Swing',signals:RECT_SIG,run:rect('W_Max_21','W_Min_21','W_Gap_Min_Max_%','W_Gap_Max_LTP_%','W_Gap_Min_LTP_%')},
   {id:'s3',name:'21-Day Rect Breakout',    style:'Swing',signals:RECT_SIG,run:rect('D_Max_21','D_Min_21','D_Gap_Min_Max_%','D_Gap_Max_LTP_%','D_Gap_Min_LTP_%')},
+  {id:'i1',name:'4H Rect Breakout (13)',   style:'Intraday',signals:RECT_SIG,run:rect('H4_Max_13','H4_Min_13','H4_Gap_Min_Max_%','H4_Gap_Max_LTP_%','H4_Gap_Min_LTP_%')},
+  {id:'i2',name:'30min Rect Breakout (8)', style:'Intraday',signals:RECT_SIG,run:rect('M30_Max_8','M30_Min_8','M30_Gap_Min_Max_%','M30_Gap_Max_LTP_%','M30_Gap_Min_LTP_%')},
+  {id:'sc1',name:'5min Rect Breakout (5)', style:'Scalping',signals:RECT_SIG,run:rect('M5_Max_5','M5_Min_5','M5_Gap_Min_Max_%','M5_Gap_Max_LTP_%','M5_Gap_Min_LTP_%')},
 ];
 const STYLES=['All','Scalping','Intraday','Swing','Positional'];
 const SIG_ORDER={'Above High':0,'Upper Breakout':1,'Above Close':2,'Golden Zone':3,'Near Upper':4,'Near Lower':5,'Lower Breakdown':6};
@@ -204,7 +207,7 @@ function buildSigChips(){
     const c=document.createElement('span');c.className='chip'+(state.sigs[s]?' on':'');c.textContent=s;
     c.onclick=()=>{state.sigs[s]=!state.sigs[s];buildSigChips();render();};el.appendChild(c);});
 }
-function toggleRange(){ document.getElementById('rangeGroup').style.display=(state.style==='All'||state.style==='Swing')?'block':'none'; }
+function toggleRange(){ document.getElementById('rangeGroup').style.display=(state.style!=='Positional')?'block':'none'; }
 document.querySelectorAll('[data-ema]').forEach(ch=>{ch.onclick=()=>{const k=ch.dataset.ema;state.ema[k]=!state.ema[k];ch.classList.toggle('on');render();};});
 ['rsiDmin','rsiDmax','rsiMmin','rsiMmax','minVol','search','dayCandle','rangeSel'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{state.range=document.getElementById('rangeSel').value;render();}));
 function resetFilters(){
@@ -226,7 +229,7 @@ function compute(){
     for(const st of act){
       const res=st.run(g); if(!res) continue;
       if(state.sigs[res.signal]===false) continue;
-      if(state.range && st.style==='Swing' && bucket(res.range)!==state.range) continue;
+      if(state.range && res.range!=null && bucket(res.range)!==state.range) continue;
       const rd=g('RSI_Daily'),rm=g('RSI_Monthly');
       if(rsiDmin!=null&&!(rd>=rsiDmin))continue; if(rsiDmax!=null&&!(rd<=rsiDmax))continue;
       if(rsiMmin!=null&&!(rm>=rsiMmin))continue; if(rsiMmax!=null&&!(rm<=rsiMmax))continue;
