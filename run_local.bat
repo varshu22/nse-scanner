@@ -10,6 +10,8 @@ REM ============================================================
 REM GitHub Desktop default clone path is Documents\GitHub\<repo>.
 REM In GitHub Desktop: Repository menu -> "Show in Explorer" to confirm the exact path.
 set REPO=C:\Users\Varsha Singh\Documents\GitHub\nse-scanner
+REM SCRIPT = your proven fast generator. It must be committed in the repo.
+set SCRIPT=NSE2000_Final.py
 set UNIVERSE=all
 set WORKERS=4
 
@@ -24,8 +26,8 @@ REM 1) sync to the latest cloud version (discard local generated files)
 git fetch origin
 git reset --hard origin/main
 
-REM 2) generate full Excel on your home connection
-python generate_scanner.py || (echo generate failed & pause & exit /b 1)
+REM 2) generate full Excel with YOUR proven script (fast, same data as manual)
+python "%SCRIPT%" || (echo generate failed & pause & exit /b 1)
 
 REM 3) build data.json for the dashboard
 python export_dashboard_data.py || (echo export failed & pause & exit /b 1)
