@@ -84,6 +84,10 @@ tbody tr:hover{background:var(--elev)}
 .empty{padding:48px;text-align:center;color:var(--faint)}
 .note{font-size:11px;color:var(--faint);margin-top:12px;line-height:1.6;border-top:1px solid var(--line);padding-top:12px}
 .demoflag{background:var(--warn-bg);color:var(--warn);padding:2px 9px;border-radius:20px;font-size:11px;font-weight:500}
+.srcbadge{padding:2px 9px;border-radius:20px;font-size:11px;font-weight:500}
+.src-fno{background:var(--info-bg);color:var(--info)}
+.src-n500{background:var(--warn-bg);color:var(--warn)}
+.src-all{background:var(--pos-bg);color:var(--pos)}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--pos);display:inline-block}
 .stratcount{font-size:11px;color:var(--faint);margin-left:2px}
 </style>
@@ -325,8 +329,11 @@ async function loadRemote(manual){
     const res=await fetch(DATA_URL+'?t='+Date.now(),{cache:'no-store'});if(!res.ok)throw new Error('HTTP '+res.status);
     const j=await res.json();if(!j.columns||!j.data)throw new Error('bad data');
     DATA={columns:j.columns,data:j.data};COLS=j.columns;reindex();
-    document.getElementById('status').innerHTML='<span class="dot"></span> live '+DATA.data.length+' stocks'+(j.generated?(' • '+j.generated):'');
-    document.getElementById('srcnote').innerHTML='Live data from GitHub'+(j.generated?(', generated '+j.generated):'')+'. Auto-refreshes every '+AUTO_REFRESH_MIN+' min.';render();
+    var _n=DATA.data.length;
+    var src=_n<=300?'F&amp;O universe':(_n<=700?'Nifty 500':'Full universe');
+    var srcClass=_n<=300?'src-fno':(_n<=700?'src-n500':'src-all');
+    document.getElementById('status').innerHTML='<span class="dot"></span> live '+DATA.data.length+' stocks • <span class="srcbadge '+srcClass+'">'+src+'</span>'+(j.generated?(' • '+j.generated):'');
+    document.getElementById('srcnote').innerHTML='Data source: <b>'+src+'</b> ('+DATA.data.length+' stocks)'+(j.generated?(', generated '+j.generated):'')+'. Auto-refreshes every '+AUTO_REFRESH_MIN+' min.';render();
   }catch(e){if(manual)alert('Could not fetch live data ('+e.message+').');if(DATA===SAMPLE||!DATA)useSample();}
 }
 function init(){reindex();buildStyles();buildStratChips();buildSigChips();buildCrossChips();buildHead();toggleRange();useSample();loadRemote(false);setInterval(()=>loadRemote(false),AUTO_REFRESH_MIN*60*1000);}

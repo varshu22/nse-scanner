@@ -98,12 +98,25 @@ except FileNotFoundError:
 if not FNO:
     print("F&O list: none available -> all stocks marked FnO=No")
 
-# UNIVERSE=fno  -> scan only F&O stocks (~208): light enough to run reliably in
-# the cloud (Yahoo throttles the full 2000+ universe from GitHub IPs).
-# UNIVERSE=all  -> scan everything (best run on an always-on home machine).
-if os.environ.get("UNIVERSE", "all").lower() == "fno" and FNO:
+# UNIVERSE controls which stocks to scan:
+#   fno       -> only F&O stocks (~208)     - lightest, cloud-reliable
+#   nifty500  -> only Nifty 500 (~500)      - cloud-reliable (proven)
+#   all       -> everything (~2059)         - run on an always-on home machine
+_uni = os.environ.get("UNIVERSE", "all").lower()
+if _uni == "fno" and FNO:
     symbols = [s for s in symbols if s.replace(".NS", "").strip().upper() in FNO]
     print(f"UNIVERSE=fno -> scanning {len(symbols)} F&O stocks only")
+elif _uni == "nifty500":
+    try:
+        import io
+        _n5 = requests.get("https://archives.nseindia.com/content/indices/ind_nifty500list.csv",
+                           headers=_headers, timeout=30)
+        _n5.raise_for_status()
+        _set5 = {str(x).strip().upper() for x in pd.read_csv(io.StringIO(_n5.text))["Symbol"].tolist()}
+        symbols = [s for s in symbols if s.replace(".NS", "").strip().upper() in _set5]
+        print(f"UNIVERSE=nifty500 -> scanning {len(symbols)} Nifty 500 stocks")
+    except Exception as e:
+        print(f"nifty500 list fetch failed ({type(e).__name__}: {str(e)[:50]}) -> keeping full universe")
 
 
 # ===============================

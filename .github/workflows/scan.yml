@@ -2,7 +2,7 @@ name: NSE Scanner (30-min, market hours)
 
 on:
   schedule:
-    # hourly during NSE market hours (09:15-15:30 IST = 03:45-10:00 UTC), Mon-Fri
+    # hourly during NSE market hours (~09:15-15:15 IST = 03:45-09:45 UTC), Mon-Fri
     - cron: '45 3-9 * * 1-5'
   workflow_dispatch:
     inputs:
@@ -34,7 +34,7 @@ jobs:
       - name: Generate scanner Excel
         env:
           WORKERS: "6"
-          UNIVERSE: "fno"   # cloud = F&O only (~208, reliable). Use "all" only on a home machine.
+          UNIVERSE: "nifty500"   # cloud = Nifty 500 (~500, proven reliable). "all" runs on a home machine.
           LIMIT: ${{ github.event.inputs.limit }}
         run: python generate_scanner.py
 
